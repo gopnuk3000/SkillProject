@@ -35,7 +35,8 @@ def main():
         'session': request.json['session'],
         'version': request.json['version'],
         'response': {
-            'end_session': False
+            'end_session': False,
+            'end_first_spam': False
         }
     }
 
@@ -85,7 +86,7 @@ def handle_dialog(req, res):
     ]:
         # Пользователь согласился, прощаемся.
         res['response']['text'] = 'Слона можно найти на Яндекс.Маркете!'
-        res['response']['end_session'] = True
+        res['response']['end_first_spam'] = True
         return
 
     # Если нет, то убеждаем его купить слона!
@@ -94,6 +95,31 @@ def handle_dialog(req, res):
     )
     res['response']['buttons'] = get_suggests(user_id)
 
+    if res['response']['end_first_spam']:
+        res['response']['text'] = 'А теперь купи кролика!'
+        # Получим подсказки
+        res['response']['buttons'] = get_suggests(user_id)
+        return
+
+
+    if req['request']['original_utterance'].lower() in [
+        'ладно',
+        'куплю',
+        'покупаю',
+        'хорошо',
+        'я покупаю',
+        'я куплю'
+    ] and res['response']['end_first_spam']:
+        # Пользователь согласился, прощаемся.
+        res['response']['text'] = 'Кролика можно найти на Яндекс.Маркете!'
+        res['response']['end_session'] = True
+        return
+
+    if res['response']['end_first_spam']:
+        res['response']['text'] = 'Все говорят "%s", а ты купи кролика!' % (
+            req['request']['original_utterance']
+        )
+        res['response']['buttons'] = get_suggests(user_id)
 
 # Функция возвращает две подсказки для ответа.
 def get_suggests(user_id):
