@@ -28,78 +28,39 @@ def main():
         }
     }
     handle_dialog(response, request.json)
-    logging.info('Response: %r', response)
+    logging.info('Request: %r', response)
     return jsonify(response)
 
 
 def handle_dialog(res, req):
     user_id = req['session']['user_id']
     if req['session']['new']:
-        res['response']['text'] = 'Привет! Назови своё имя!'
-        sessionStorage[user_id] = {
-            'first_name': None,  # здесь будет храниться имя
-            'game_started': False  # здесь информация о том, что пользователь начал игру. По умолчанию False
-        }
+        res['response']['text'] = \
+            'Привет! Я могу показать город или сказать расстояние между городами!'
         return
-
-    if sessionStorage[user_id]['first_name'] is None:
-        first_name = get_first_name(req)
-        if first_name is None:
-            res['response']['text'] = 'Не расслышала имя. Повтори, пожалуйста!'
-        else:
-            sessionStorage[user_id]['first_name'] = first_name
-            # создаём пустой массив, в который будем записывать города, которые пользователь уже отгадал
-            sessionStorage[user_id]['guessed_cities'] = []
-            # как видно из предыдущего навыка, сюда мы попали, потому что пользователь написал своем имя.
-            # Предлагаем ему сыграть и два варианта ответа "Да" и "Нет".
-            res['response']['text'] = f'Приятно познакомиться, {first_name.title()}. Я Алиса. Отгадаешь город по фото?'
-            res['response']['buttons'] = [
-                {
-                    'title': 'Да',
-                    'hide': True
-                },
-                {
-                    'title': 'Нет',
-                    'hide': True
-                }
-            ]
+    # Получаем города из нашего
+    cities = get_cities(req)
+    if not cities:
+        res['response']['text'] = 'Ты не написал название ни одного города!'
+    elif len(cities) == 1:
+        res['response']['text'] = 'Этот город в стране - ' + \
+                                  get_country(cities[0])
+    elif len(cities) == 2:
+        distance = get_distance(get_coordinates(
+            cities[0]), get_coordinates(cities[1]))
+        res['response']['text'] = 'Расстояние между этими городами: ' + \
+                                  str(round(distance)) + ' км.'
     else:
-        # У нас уже есть имя, и теперь мы ожидаем ответ на предложение сыграть.
-        # В sessionStorage[user_id]['game_started'] хранится True или False в зависимости от того,
-        # начал пользователь игру или нет.
-        if not sessionStorage[user_id]['game_started']:
-            # игра не начата, значит мы ожидаем ответ на предложение сыграть.
-            if 'да' in req['request']['nlu']['tokens']:
-                # если пользователь согласен, то проверяем не отгадал ли он уже все города.
-                # По схеме можно увидеть, что здесь окажутся и пользователи, которые уже отгадывали города
-                if len(sessionStorage[user_id]['guessed_cities']) == 3:
-                    # если все три города отгаданы, то заканчиваем игру
-                    res['response']['text'] = 'Ты отгадал все города!'
-                    res['end_session'] = True
-                else:
-                    # если есть неотгаданные города, то продолжаем игру
-                    sessionStorage[user_id]['game_started'] = True
-                    # номер попытки, чтобы показывать фото по порядку
-                    sessionStorage[user_id]['attempt'] = 1
-                    # функция, которая выбирает город для игры и показывает фото
-                    play_game(res, req)
-            elif 'нет' in req['request']['nlu']['tokens']:
-                res['response']['text'] = 'Ну и ладно!'
-                res['end_session'] = True
-            else:
-                res['response']['text'] = 'Не поняла ответа! Так да или нет?'
-                res['response']['buttons'] = [
-                    {
-                        'title': 'Да',
-                        'hide': True
-                    },
-                    {
-                        'title': 'Нет',
-                        'hide': True
-                    }
-                ]
-        else:
-            play_game(res, req)
+        res['response']['text'] = 'Слишком много городов!'
+
+
+def get_cities(req):
+    cities = []
+    for entity in req['request']['nlu']['entities']:
+        if entity['type'] == 'YANDEX.GEO':
+            if 'city' in entity['value']:
+                cities.append(entity['value']['city'])
+    return cities
 
 
 def play_game(res, req):
