@@ -44,10 +44,10 @@ def handle_dialog(res, req):
         res['response']['text'] = 'Ты не написал название ни одного города!'
     elif len(cities) == 1:
         res['response']['text'] = 'Этот город в стране - ' + \
-                                  get_country(cities[0])
+                                  get_geo_info(cities[0], 'country')
     elif len(cities) == 2:
-        distance = get_distance(get_coordinates(
-            cities[0]), get_coordinates(cities[1]))
+        distance = get_distance(get_geo_info(
+            cities[0], 'coordinates'), get_geo_info(cities[1], 'coordinates'))
         res['response']['text'] = 'Расстояние между этими городами: ' + \
                                   str(round(distance)) + ' км.'
     else:
@@ -132,39 +132,31 @@ def get_first_name(req):
             return entity['value'].get('first_name', None)
 
 
-def get_coordinates(city):
+def get_geo_info(city_name, type_info):
     url = "https://geocode-maps.yandex.ru/1.x/"
 
     params = {
-        'geocode': city,
+        'geocode': city_name,
         'format': 'json',
-        'apikey': "40d1649f-0493-4b70-98ba-98533de7710b"
+        'apikey': "f3a0fe3a-b07e-4840-a1da-06f18b2ddf13"
     }
 
-    response = requests.get(url, params)
-    json = response.json()
-    point_str = json['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['Point']['pos']
-    point_array = [float(x) for x in point_str.split(' ')]
+    if type_info == 'country':
+        response = requests.get(url, params)
+        json = response.json()
 
-    return point_array
+        return \
+            json['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['metaDataProperty'][
+                'GeocoderMetaData'][
+                'AddressDetails']['Country']['CountryName']
 
+    elif type_info == 'coordinates':
+        response = requests.get(url, params)
+        json = response.json()
+        point_str = json['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['Point']['pos']
+        point_array = [float(x) for x in point_str.split(' ')]
 
-def get_country(city):
-    url = "https://geocode-maps.yandex.ru/1.x/"
-
-    params = {
-        'geocode': city,
-        'format': 'json',
-        'apikey': "40d1649f-0493-4b70-98ba-98533de7710b"
-    }
-
-    response = requests.get(url, params)
-    json = response.json()
-
-    return \
-        json['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['metaDataProperty'][
-            'GeocoderMetaData'][
-            'AddressDetails']['Country']['CountryName']
+        return point_array
 
 
 def get_distance(p1, p2):
